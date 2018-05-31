@@ -98,7 +98,8 @@
     "superagent": "^1.2.0",
     "superagent-promise": "^1.0.3",
     "unique-slug": "2.0.0",
-    "uuid": "^3.2.1"
+    "uuid": "^3.2.1",
+    "yarn": "^1.7.0"
   },
   "devDependencies": {
     "ava": "^0.25.0",
