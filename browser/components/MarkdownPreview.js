@@ -26,7 +26,7 @@ const dialog = remote.dialog
 const markdownStyle = require('!!css!stylus?sourceMap!./markdown.styl')[0][1]
 const appPath = 'file://' + (process.env.NODE_ENV === 'production'
   ? app.getAppPath()
-  : path.resolve())
+  : path.resolve()).replace(/\\/g, '/')
 const CSS_FILES = [
   `${appPath}/node_modules/katex/dist/katex.min.css`,
   `${appPath}/node_modules/codemirror/lib/codemirror.css`
