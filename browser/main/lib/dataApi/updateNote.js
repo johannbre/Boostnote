@@ -3,6 +3,7 @@ const _ = require('lodash')
 const path = require('path')
 const CSON = require('@rokt33r/season')
 const { findStorage } = require('browser/lib/findStorage')
+const localHistory = require('./localHistory')
 
 function validateInput (input) {
   const validatedInput = {}
@@ -118,6 +119,8 @@ function updateNote (storageKey, noteKey, input) {
         noteData.title
       }
 
+      debugger
+      localHistory.saveHistoryRevision(path.join(storage.path, 'notes'), noteKey, _.omit(noteData, ['key', 'storage']));
       Object.assign(noteData, input, {
         key: noteKey,
         updatedAt: new Date(),
