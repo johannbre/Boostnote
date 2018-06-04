@@ -111,9 +111,18 @@ class ShowHistoryModal extends React.Component {
         onKeyDown={(e) => this.handleKeyDown(e)}
       >
         <div styleName='header'>
-          <div styleName='title'>{i18n.__('Make a note')}</div>
+          <div styleName='title'>{i18n.__('History for note')}</div>
         </div>
         <ModalEscButton handleEscButtonClick={(e) => this.handleCloseButtonClick(e)} />
+        <NoteList style={{width: this.state.listWidth}}
+            {..._.pick(this.props, [
+              'dispatch',
+              'data',
+              'config',
+              'params',
+              'location'
+            ])}
+          />
         <div styleName='control'>
           <button styleName='control-button'
             onClick={(e) => this.handleMarkdownNoteButtonClick(e)}
