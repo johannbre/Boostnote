@@ -88,6 +88,7 @@
     "raphael": "^2.2.7",
     "react": "^15.5.4",
     "react-codemirror": "^0.3.0",
+    "react-diff-view": "^1.4.11",
     "react-dom": "^15.0.2",
     "react-redux": "^4.4.5",
     "react-sortable-hoc": "^0.6.7",
@@ -97,6 +98,7 @@
     "striptags": "^2.2.1",
     "superagent": "^1.2.0",
     "superagent-promise": "^1.0.3",
+    "unidiff": "0.0.4",
     "unique-slug": "2.0.0",
     "uuid": "^3.2.1",
     "yarn": "^1.7.0"

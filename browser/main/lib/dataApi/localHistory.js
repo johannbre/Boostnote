@@ -4,12 +4,19 @@ import { findStorage } from 'browser/lib/findStorage'
 const fs = require('fs')
 const path = require('path')
 const CSON = require('@rokt33r/season')
+const fsPlus = require('fs-plus')
 
 /**
  * Keep local history of notes
  */
+const GranularityEnum = Object.freeze({
+    "day": 1,
+    "hour": 2,
+    "minute": 3,
+    "second": 4
+});
+
 module.exports = {
-    localHistoryView: null,
 
     config: {
 
@@ -24,8 +31,7 @@ module.exports = {
         daysLimit: {
             type: 'integer',
             default: 30,
-            description: 'Days retention limit by original files. '
-                + 'The oldest revision files are deleted when purging (local-history:purge)'
+            description: 'Days retention limit by original files. The oldest revision files are deleted when purging (local-history:purge)'
         },
 
         // enable automatic purge
@@ -34,6 +40,12 @@ module.exports = {
             default: false,
             title: 'Automatic purge',
             description: 'Enable or Disable the automatic purge. Triggered, max 1 time per day.'
+        },
+
+        granularity: {
+            type: 'string',
+            default: GranularityEnum.minute,
+            description: 'How often are local history snapshots saved'
         },
 
         difftoolCommand: {
@@ -53,86 +65,71 @@ module.exports = {
 
     saveHistoryRevision(dir, noteKey, noteData) {
         let config = this.config;
-        let fsPlus, fileSizeLimit, workspaceView;
-        fsPlus = require('fs-plus');
+        let fileSizeLimit, workspaceView;
         fileSizeLimit = this.config.fileSizeLimit;
 
         let file, revFileName;
 
-        let now = new Date();
-        let day = '' + now.getDate();
-        let month = '' + (now.getMonth() + 1);
-        let hour = '' + now.getHours(); //24-hours format
-        let minute = '' + now.getMinutes();
-        let second = '' + now.getSeconds();
 
-        if (day.length === 1) {
-            day = '0' + day;
-        }
-
-        if (month.length === 1) {
-            month = '0' + month;
-        }
-
-        if (hour.length === 1) {
-            hour = '0' + hour;
-        }
-
-        if (minute.length === 1) {
-            minute = '0' + minute;
-        }
-
-        if (second.length === 1) {
-            second = '0' + second;
-        }
-        debugger
-        // YYYY-mm-dd_HH-ii-ss_basename
-        revFileName = now.getFullYear() +
-            '-' + month +
-            '-' + day +
-            '_' + hour +
-            '-' + minute +
-            '-' + second +
-            '_' + noteKey
-            ;
+        // basename_YYYY-mm-dd_HH-ii-ss
+        revFileName = this.createFileName(noteKey, config.granularity.default);
 
         if (process.platform === 'win32') {
             dir = dir.replace(/:/g, '');
         }
 
-        file = path.join(dir, '.history', revFileName + '.cson');
+        file = path.join(dir, '.history', revFileName);
         CSON.writeFileSync(file, _.omit(noteData, ['key', 'storage']));
     },
 
 
     getFileRevisionList(dir, noteKey) {
         let isItsRev, originBaseName, files, fileBaseName, pathDirName, list;
-    
-        files        = [];
-        fileBaseName = path.basename(filePath);
-    
+        let historyDir = path.join(dir, '.history');
         if (process.platform === 'win32') {
-            dir = dir.replace(/:/g,'');
+            dir = dir.replace(/:/g, '');
         }
-    
+
         // list the directory (recursively) of the file
-        list = fs.listTreeSync(path.join(
-          dir, '.history'
-        ));
-    
-        for (let i in list) {
-          originBaseName = this.getOriginBaseName(list[i]);
-    
-          isItsRev = (
-            typeof originBaseName === 'string'
-            && path.basename(originBaseName) === fileBaseName
-          );
-    
-          if (isItsRev && fs.isFileSync(list[i])) {
-            files.push(list[i]);
-          }
-        }
-    
+
+        files = _.filter(fsPlus.listTreeSync(historyDir), function (file) {
+            let fileName = path.basename(file)
+
+            isItsRev = (
+                typeof fileName === 'string' &&
+                fileName.startsWith(noteKey)
+            );
+
+            return isItsRev && fsPlus.isFileSync(file);
+        });
+
         return files.sort().reverse();
-      },
+    },
+
+    prependZero(value) {
+        return '0'.repeat(2 - ('' + value).length) + '' + value;
+    },
+
+    createFileName(noteKey, granularity) {
+        let now = new Date();
+        let parts = [
+            now.getFullYear,
+            this.prependZero(now.getMonth() + 1, 2),
+            this.prependZero(now.getDate())
+        ];
+
+        if (this.config.granularity.default >= this.GranularityEnum.hour) {
+            parts.push(this.prependZero(now.getHours())); //24-hours format
+        };
+
+        if (this.config.granularity.default >= this.GranularityEnum.minute) {
+            parts.push(this.prependZero(now.getMinutes()));
+        };
+
+        if (this.config.granularity.default >= this.GranularityEnum.second) {
+            parts.push(this.prependZero(now.getSeconds()));
+        };
+
+        return noteKey + '_' + parts.join('-') + '.cson';
+    }
 };

@@ -26,9 +26,12 @@ import ToggleModeButton from './ToggleModeButton'
 import InfoPanel from './InfoPanel'
 import InfoPanelTrashed from './InfoPanelTrashed'
 import { formatDate } from 'browser/lib/date-formatter'
+import modal from 'browser/main/lib/modal'
 import { getTodoPercentageOfCompleted } from 'browser/lib/getTodoStatus'
 import striptags from 'striptags'
 import { confirmDeleteNote } from 'browser/lib/confirmDeleteNote'
+import ShowHistoryButton from './ShowHistoryButton'
+import ShowHistoryModal from '../modals/ShowHistoryModal';
 
 class MarkdownNoteDetail extends React.Component {
   constructor (props) {
@@ -271,6 +274,18 @@ class MarkdownNoteDetail extends React.Component {
     if (infoPanel.style) infoPanel.style.display = infoPanel.style.display === 'none' ? 'inline' : 'none'
   }
 
+  handleShowHistoryButtonClick(e) {
+    const { location, dispatch } = this.props    
+    const { note } = this.state
+
+    modal.open(ShowHistoryModal, {
+      storage: "storage.key",
+      folder: "folder.key",
+      dispatch,
+      location
+    })
+  }
+
   print (e) {
     ee.emit('print')
   }
@@ -348,7 +363,7 @@ class MarkdownNoteDetail extends React.Component {
       </div>
     </div>
 
-    const detailTopBar = <div styleName='info'>
+const detailTopBar = <div styleName='info'>
       <div styleName='info-left'>
         <div styleName='info-left-top'>
           <FolderSelect styleName='info-left-top-folderSelect'
@@ -395,6 +410,10 @@ class MarkdownNoteDetail extends React.Component {
 
         <InfoButton
           onClick={(e) => this.handleInfoButtonClick(e)}
+        />
+
+        <ShowHistoryButton
+          onClick={(e) => this.handleShowHistoryButtonClick(e)}
         />
 
         <InfoPanel

@@ -119,15 +119,15 @@ function updateNote (storageKey, noteKey, input) {
         noteData.title
       }
 
-      debugger
-      localHistory.saveHistoryRevision(path.join(storage.path, 'notes'), noteKey, _.omit(noteData, ['key', 'storage']));
+      let notesDir = path.join(storage.path, 'notes');
+      localHistory.saveHistoryRevision(notesDir, noteKey, _.omit(noteData, ['key', 'storage']));
       Object.assign(noteData, input, {
         key: noteKey,
         updatedAt: new Date(),
         storage: storageKey
       })
 
-      CSON.writeFileSync(path.join(storage.path, 'notes', noteKey + '.cson'), _.omit(noteData, ['key', 'storage']))
+      CSON.writeFileSync(notePath, _.omit(noteData, ['key', 'storage']))
 
       return noteData
     })
