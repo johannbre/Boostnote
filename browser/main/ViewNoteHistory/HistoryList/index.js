@@ -56,7 +56,11 @@ class NoteHistoryList extends React.Component {
     // TODO: not Selected noteKeys but SelectedNote(for reusing)
     this.state = {
       shiftKeyDown: false,
-      selectedNoteKeys: []
+      selectedNoteKeys: [],
+    }
+
+    this.data = {
+      revisions: props.revisions
     }
 
     this.contextNotes = []
@@ -94,8 +98,8 @@ class NoteHistoryList extends React.Component {
   componentDidUpdate (prevProps) {
     const { location } = this.props
     const { selectedNoteKeys } = this.state
-    const visibleNoteKeys = this.revisions.map(note => note.key)
-    const note = this.revisions[0]
+    const visibleNoteKeys = this.data.revisions.map(note => note.key)
+    const note = this.data.revisions[0]
     const prevKey = prevProps.location.query.key
     const noteKey = visibleNoteKeys.includes(prevKey) ? prevKey : note && note.key
 
@@ -157,13 +161,13 @@ class NoteHistoryList extends React.Component {
   }
 
   getNoteKeyFromTargetIndex (targetIndex) {
-    const note = Object.assign({}, this.revisions[targetIndex])
+    const note = Object.assign({}, this.data.revisions[targetIndex])
     const noteKey = getNoteKey(note)
     return noteKey
   }
 
   selectPriorNote () {
-    if (this.revisions == null || this.revisions.length === 0) {
+    if (this.data.revisions == null || this.data.revisions.length === 0) {
       return
     }
     let { selectedNoteKeys } = this.state
@@ -190,14 +194,14 @@ class NoteHistoryList extends React.Component {
   }
 
   selectNextNote () {
-    if (this.revisions == null || this.revisions.length === 0) {
+    if (this.data.revisions == null || this.data.revisions.length === 0) {
       return
     }
     let { selectedNoteKeys } = this.state
     const { shiftKeyDown } = this.state
 
     let targetIndex = this.getTargetIndex()
-    const isTargetLastNote = targetIndex === this.revisions.length - 1
+    const isTargetLastNote = targetIndex === this.data.revisions.length - 1
 
     if (isTargetLastNote && shiftKeyDown) {
       return
@@ -206,7 +210,7 @@ class NoteHistoryList extends React.Component {
     } else {
       targetIndex++
       if (targetIndex < 0) targetIndex = 0
-      else if (targetIndex > this.revisions.length - 1) targetIndex = this.revisions.length - 1
+      else if (targetIndex > this.data.revisions.length - 1) targetIndex = this.data.revisions.length - 1
     }
 
     if (!shiftKeyDown) { selectedNoteKeys = [] }
@@ -224,7 +228,7 @@ class NoteHistoryList extends React.Component {
 
   jumpNoteByHashHandler (event, noteHash) {
     // first argument event isn't used.
-    if (this.revisions === null || this.revisions.length === 0) {
+    if (this.data.revisions === null || this.data.revisions.length === 0) {
       return
     }
 
@@ -417,7 +421,7 @@ class NoteHistoryList extends React.Component {
 
   alertIfSnippet () {
     const targetIndex = this.getTargetIndex()
-    if (this.revisions[targetIndex].type === 'SNIPPET_NOTE') {
+    if (this.data.revisions[targetIndex].type === 'SNIPPET_NOTE') {
       dialog.showMessageBox(remote.getCurrentWindow(), {
         type: 'warning',
         message: i18n.__('Sorry!'),
@@ -436,7 +440,7 @@ class NoteHistoryList extends React.Component {
       selectedNoteKeys.push(noteKey)
     }
 
-    const notes = this.revisions.map((note) => Object.assign({}, note))
+    const notes = this.data.revisions.map((note) => Object.assign({}, note))
     const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
     const noteData = JSON.stringify(selectedNotes)
     e.dataTransfer.setData('note', noteData)
@@ -446,7 +450,7 @@ class NoteHistoryList extends React.Component {
   handleNoteContextMenu (e, uniqueKey) {
     const { location } = this.props
     const { selectedNoteKeys } = this.state
-    const note = findNoteByKey(this.revisions, uniqueKey)
+    const note = findNoteByKey(this.data.revisions, uniqueKey)
     const noteKey = getNoteKey(note)
 
     if (selectedNoteKeys.length === 0 || !selectedNoteKeys.includes(noteKey)) {
@@ -501,7 +505,7 @@ class NoteHistoryList extends React.Component {
   updateSelectedNotes (updateFunc, cleanSelection = true) {
     const { selectedNoteKeys } = this.state
     const { dispatch } = this.props
-    const notes = this.revisions.map((note) => Object.assign({}, note))
+    const notes = this.data.revisions.map((note) => Object.assign({}, note))
     const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
 
     if (!_.isFunction(updateFunc)) {
@@ -560,7 +564,7 @@ class NoteHistoryList extends React.Component {
 
   publishMarkdownNow () {
     const {selectedNoteKeys} = this.state
-    const notes = this.revisions.map((note) => Object.assign({}, note))
+    const notes = this.data.revisions.map((note) => Object.assign({}, note))
     const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
     const firstNote = selectedNotes[0]
     const config = ConfigManager.get()
@@ -659,7 +663,7 @@ class NoteHistoryList extends React.Component {
 
   getTargetIndex () {
     const { location } = this.props
-    const targetIndex = _.findIndex(this.revisions, (note) => {
+    const targetIndex = _.findIndex(this.data.revisions, (note) => {
       return getNoteKey(note) === location.query.key
     })
     return targetIndex
@@ -727,8 +731,7 @@ class NoteHistoryList extends React.Component {
       }
     })
 
-    this.revisions = localHistory.getNoteRevisions(note.storage, note.key)
-    const revisionList = this.revisions
+    const revisionList = this.data.revisions
       .map(note => {
         if (note == null) {
           return null
