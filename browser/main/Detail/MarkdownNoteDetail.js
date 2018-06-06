@@ -275,14 +275,17 @@ class MarkdownNoteDetail extends React.Component {
   }
 
   handleShowHistoryButtonClick(e) {
-    const { location, dispatch } = this.props    
+    const { location, dispatch, config, data } = this.props    
     const { note } = this.state
 
     modal.open(ShowHistoryModal, {
       storage: "storage.key",
       folder: "folder.key",
+      data,
       dispatch,
-      location
+      location,
+      config,
+      note
     })
   }
 

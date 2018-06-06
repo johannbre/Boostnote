@@ -7,151 +7,120 @@ import ee from 'browser/main/lib/eventEmitter'
 import ModalEscButton from 'browser/components/ModalEscButton'
 import AwsMobileAnalyticsConfig from 'browser/main/lib/AwsMobileAnalyticsConfig'
 import i18n from 'browser/lib/i18n'
+import HistoryList from '../ViewNoteHistory/HistoryList'
+import ConfigManager from 'browser/main/lib/ConfigManager'
+import localHistory from 'browser/main/lib/dataApi/localHistoryManagement'
 
 class ShowHistoryModal extends React.Component {
-  constructor (props) {
+  constructor(props) {
     super(props)
 
+    debugger
     this.state = {
+      revisionListWidth: props.config.revisionListWidth,
+      revisions: localHistory.getNoteRevisions(props.note.storage, props.note.key)
     }
   }
 
-  componentDidMount () {
-    this.refs.markdownButton.focus()
+  componentDidMount() {
   }
 
-  handleCloseButtonClick (e) {
+  handleCloseButtonClick(e) {
     this.props.close()
   }
 
-  handleMarkdownNoteButtonClick (e) {
-    AwsMobileAnalyticsConfig.recordDynamicCustomEvent('ADD_MARKDOWN')
-    AwsMobileAnalyticsConfig.recordDynamicCustomEvent('ADD_ALLNOTE')
-    const { storage, folder, dispatch, location } = this.props
-    dataApi
-      .createNote(storage, {
-        type: 'MARKDOWN_NOTE',
-        folder: folder,
-        title: '',
-        content: ''
-      })
-      .then((note) => {
-        const noteHash = note.key
-        dispatch({
-          type: 'UPDATE_NOTE',
-          note: note
-        })
-        hashHistory.push({
-          pathname: location.pathname,
-          query: {key: noteHash}
-        })
-        ee.emit('list:jump', noteHash)
-        ee.emit('detail:focus')
-        this.props.close()
-      })
+  handleLeftSlideMouseDown(e) {
+    e.preventDefault()
+    this.setState({
+      isLeftSliderFocused: true
+    })
   }
 
-  handleMarkdownNoteButtonKeyDown (e) {
-    if (e.keyCode === 9) {
-      e.preventDefault()
-      this.refs.snippetButton.focus()
+  handleMouseUp(e) {
+    // Change width of NoteList component.
+    if (this.state.isLeftSliderFocused) {
+      this.setState({
+        isLeftSliderFocused: false
+      }, () => {
+        const { dispatch } = this.props
+        const newListWidth = this.state.revisionListWidth
+        // TODO: ConfigManager should dispatch itself.
+        ConfigManager.set({ revisionListWidth: newListWidth })
+        dispatch({
+          type: 'SET_LIST_WIDTH',
+          listWidth: newListWidth
+        })
+      })
     }
   }
 
-  handleSnippetNoteButtonClick (e) {
-    AwsMobileAnalyticsConfig.recordDynamicCustomEvent('ADD_SNIPPET')
-    AwsMobileAnalyticsConfig.recordDynamicCustomEvent('ADD_ALLNOTE')
-    const { storage, folder, dispatch, location } = this.props
-
-    dataApi
-      .createNote(storage, {
-        type: 'SNIPPET_NOTE',
-        folder: folder,
-        title: '',
-        description: '',
-        snippets: [{
-          name: '',
-          mode: 'text',
-          content: ''
-        }]
+  handleMouseMove(e) {
+    if (this.state.isLeftSliderFocused) {
+      // debugger
+      // const offset = this.refs.body.getBoundingClientRect().left
+      let newListWidth = e.pageX - 40
+      if (newListWidth < 80) {
+        newListWidth = 80
+      } else if (newListWidth > 600) {
+        newListWidth = 600
+      }
+      this.setState({
+        revisionListWidth: newListWidth
       })
-      .then((note) => {
-        const noteHash = note.key
-        dispatch({
-          type: 'UPDATE_NOTE',
-          note: note
-        })
-        hashHistory.push({
-          pathname: location.pathname,
-          query: {key: noteHash}
-        })
-        ee.emit('list:jump', noteHash)
-        ee.emit('detail:focus')
-        this.props.close()
-      })
+    }
   }
 
-  handleSnippetNoteButtonKeyDown (e) {
+  handleSnippetNoteButtonKeyDown(e) {
     if (e.keyCode === 9) {
       e.preventDefault()
       this.refs.markdownButton.focus()
     }
   }
 
-  handleKeyDown (e) {
+  handleKeyDown(e) {
     if (e.keyCode === 27) {
       this.props.close()
     }
   }
 
-  render () {
+  render() {
+    var unidiff = require('unidiff')
+    var diff = unidiff.diffLines(
+      'a quick\nbrown\nfox\njumped\nover\nthe\nlazy\ndog\n',
+      'a quick\nbrown\ncat\njumped\nat\nthe\nnot-so-lazy\nfox\n'
+    )
     return (
       <div styleName='root'
         tabIndex='-1'
-        onKeyDown={(e) => this.handleKeyDown(e)}
-      >
+        onMouseMove={(e) => this.handleMouseMove(e)}
+        onMouseUp={(e) => this.handleMouseUp(e)}
+        onKeyDown={(e) => this.handleKeyDown(e)}>
+
         <div styleName='header'>
-          <div styleName='title'>{i18n.__('History for note')}</div>
+          <div styleName='title'>{i18n.__('Note history')}</div>
         </div>
         <ModalEscButton handleEscButtonClick={(e) => this.handleCloseButtonClick(e)} />
-        <NoteList style={{width: this.state.listWidth}}
-            {..._.pick(this.props, [
-              'dispatch',
-              'data',
-              'config',
-              'params',
-              'location'
-            ])}
-          />
-        <div styleName='control'>
-          <button styleName='control-button'
-            onClick={(e) => this.handleMarkdownNoteButtonClick(e)}
-            onKeyDown={(e) => this.handleMarkdownNoteButtonKeyDown(e)}
-            ref='markdownButton'
-          >
-            <i styleName='control-button-icon'
-              className='fa fa-file-text-o'
-            /><br />
-            <span styleName='control-button-label'>{i18n.__('Markdown Note')}</span><br />
-            <span styleName='control-button-description'>{i18n.__('This format is for creating text documents. Checklists, code blocks and Latex blocks are available.')}</span>
-          </button>
 
-          <button styleName='control-button'
-            onClick={(e) => this.handleSnippetNoteButtonClick(e)}
-            onKeyDown={(e) => this.handleSnippetNoteButtonKeyDown(e)}
-            ref='snippetButton'
-          >
-            <i styleName='control-button-icon'
-              className='fa fa-code'
-            /><br />
-            <span styleName='control-button-label'>{i18n.__('Snippet Note')}</span><br />
-            <span styleName='control-button-description'>{i18n.__('This format is for creating code snippets. Multiple snippets can be grouped into a single note.')}
-            </span>
-          </button>
+        <HistoryList style={{ width: this.state.revisionListWidth }}
+          revisions={this.state.revisions}
+          {..._.pick(this.props, [
+            'dispatch',
+            'data',
+            'config',
+            'params',
+            'location',
+            'selectedNoteKeys'
+          ])}
+        />
 
+
+        <div styleName={this.state.isLeftSliderFocused ? 'slider--active' : 'slider'}
+          style={{ left: this.state.revisionListWidth - 1 }}
+          onMouseDown={(e) => this.handleLeftSlideMouseDown(e)}
+          draggable='false'>
+          <div styleName='slider-hitbox' />
         </div>
         <div styleName='description'><i className='fa fa-arrows-h' />{i18n.__('Tab to switch format')}</div>
-
       </div>
     )
   }
