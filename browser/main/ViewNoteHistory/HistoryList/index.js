@@ -9,25 +9,21 @@ import ee from 'browser/main/lib/eventEmitter'
 import dataApi from 'browser/main/lib/dataApi'
 import attachmentManagement from 'browser/main/lib/dataApi/attachmentManagement'
 import ConfigManager from 'browser/main/lib/ConfigManager'
-import NoteItem from 'browser/components/NoteItem'
-import NoteItemSimple from 'browser/components/NoteItemSimple'
+import RevisionListItem from '../RevisionListItem/RevisionListItem'
 import searchFromNotes from 'browser/lib/search'
 import fs from 'fs'
 import path from 'path'
 import { hashHistory } from 'react-router'
 import copy from 'copy-to-clipboard'
 import AwsMobileAnalyticsConfig from 'browser/main/lib/AwsMobileAnalyticsConfig'
-import Markdown from '../../lib/markdown'
+import Markdown from '../../../lib/markdown'
 import i18n from 'browser/lib/i18n'
+import localHistory from 'browser/main/lib/dataApi/localHistoryManagement'
 import { confirmDeleteNote } from 'browser/lib/confirmDeleteNote'
 
 const { remote } = require('electron')
 const { Menu, MenuItem, dialog } = remote
 const WP_POST_PATH = '/wp/v2/posts'
-
-function sortByUpdatedAt (a, b) {
-  return new Date(b.updatedAt) - new Date(a.updatedAt)
-}
 
 function getNoteKey (note) {
   return note.key
@@ -53,13 +49,9 @@ class NoteHistoryList extends React.Component {
     this.jumpNoteByHash = this.jumpNoteByHashHandler.bind(this)
     this.handleNoteHistoryListKeyUp = this.handleNoteHistoryListKeyUp.bind(this)
     this.getNoteKeyFromTargetIndex = this.getNoteKeyFromTargetIndex.bind(this)
-    this.deleteNote = this.deleteNote.bind(this)
     this.focusNote = this.focusNote.bind(this)
     this.getNoteStorage = this.getNoteStorage.bind(this)
     this.getNoteFolder = this.getNoteFolder.bind(this)
-    this.getViewType = this.getViewType.bind(this)
-    this.restoreNote = this.restoreNote.bind(this)
-    this.copyNoteLink = this.copyNoteLink.bind(this)
 
     // TODO: not Selected noteKeys but SelectedNote(for reusing)
     this.state = {
@@ -76,7 +68,6 @@ class NoteHistoryList extends React.Component {
     ee.on('list:prior', this.selectPriorNoteHandler)
     ee.on('list:focus', this.focusHandler)
     ee.on('list:isMarkdownNote', this.alertIfSnippetHandler)
-    ee.on('import:file', this.importFromFileHandler)
     ee.on('list:jump', this.jumpNoteByHash)
   }
 
@@ -97,15 +88,14 @@ class NoteHistoryList extends React.Component {
     ee.off('list:prior', this.selectPriorNoteHandler)
     ee.off('list:focus', this.focusHandler)
     ee.off('list:isMarkdownNote', this.alertIfSnippetHandler)
-    ee.off('import:file', this.importFromFileHandler)
     ee.off('list:jump', this.jumpNoteByHash)
   }
 
   componentDidUpdate (prevProps) {
     const { location } = this.props
     const { selectedNoteKeys } = this.state
-    const visibleNoteKeys = this.notes.map(note => note.key)
-    const note = this.notes[0]
+    const visibleNoteKeys = this.revisions.map(note => note.key)
+    const note = this.revisions[0]
     const prevKey = prevProps.location.query.key
     const noteKey = visibleNoteKeys.includes(prevKey) ? prevKey : note && note.key
 
@@ -167,13 +157,13 @@ class NoteHistoryList extends React.Component {
   }
 
   getNoteKeyFromTargetIndex (targetIndex) {
-    const note = Object.assign({}, this.notes[targetIndex])
+    const note = Object.assign({}, this.revisions[targetIndex])
     const noteKey = getNoteKey(note)
     return noteKey
   }
 
   selectPriorNote () {
-    if (this.notes == null || this.notes.length === 0) {
+    if (this.revisions == null || this.revisions.length === 0) {
       return
     }
     let { selectedNoteKeys } = this.state
@@ -200,14 +190,14 @@ class NoteHistoryList extends React.Component {
   }
 
   selectNextNote () {
-    if (this.notes == null || this.notes.length === 0) {
+    if (this.revisions == null || this.revisions.length === 0) {
       return
     }
     let { selectedNoteKeys } = this.state
     const { shiftKeyDown } = this.state
 
     let targetIndex = this.getTargetIndex()
-    const isTargetLastNote = targetIndex === this.notes.length - 1
+    const isTargetLastNote = targetIndex === this.revisions.length - 1
 
     if (isTargetLastNote && shiftKeyDown) {
       return
@@ -216,7 +206,7 @@ class NoteHistoryList extends React.Component {
     } else {
       targetIndex++
       if (targetIndex < 0) targetIndex = 0
-      else if (targetIndex > this.notes.length - 1) targetIndex = this.notes.length - 1
+      else if (targetIndex > this.revisions.length - 1) targetIndex = this.revisions.length - 1
     }
 
     if (!shiftKeyDown) { selectedNoteKeys = [] }
@@ -234,7 +224,7 @@ class NoteHistoryList extends React.Component {
 
   jumpNoteByHashHandler (event, noteHash) {
     // first argument event isn't used.
-    if (this.notes === null || this.notes.length === 0) {
+    if (this.revisions === null || this.revisions.length === 0) {
       return
     }
 
@@ -427,7 +417,7 @@ class NoteHistoryList extends React.Component {
 
   alertIfSnippet () {
     const targetIndex = this.getTargetIndex()
-    if (this.notes[targetIndex].type === 'SNIPPET_NOTE') {
+    if (this.revisions[targetIndex].type === 'SNIPPET_NOTE') {
       dialog.showMessageBox(remote.getCurrentWindow(), {
         type: 'warning',
         message: i18n.__('Sorry!'),
@@ -446,7 +436,7 @@ class NoteHistoryList extends React.Component {
       selectedNoteKeys.push(noteKey)
     }
 
-    const notes = this.notes.map((note) => Object.assign({}, note))
+    const notes = this.revisions.map((note) => Object.assign({}, note))
     const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
     const noteData = JSON.stringify(selectedNotes)
     e.dataTransfer.setData('note', noteData)
@@ -456,7 +446,7 @@ class NoteHistoryList extends React.Component {
   handleNoteContextMenu (e, uniqueKey) {
     const { location } = this.props
     const { selectedNoteKeys } = this.state
-    const note = findNoteByKey(this.notes, uniqueKey)
+    const note = findNoteByKey(this.revisions, uniqueKey)
     const noteKey = getNoteKey(note)
 
     if (selectedNoteKeys.length === 0 || !selectedNoteKeys.includes(noteKey)) {
@@ -465,9 +455,6 @@ class NoteHistoryList extends React.Component {
 
     const pinLabel = note.isPinned ? i18n.__('Remove pin') : i18n.__('Pin to Top')
     const deleteLabel = i18n.__('Delete Note')
-    const cloneNote = i18n.__('Clone Note')
-    const restoreNote = i18n.__('Restore Note')
-    const copyNoteLink = i18n.__('Copy Note Link')
     const publishLabel = i18n.__('Publish Blog')
     const updateLabel = i18n.__('Update Blog')
     const openBlogLabel = i18n.__('Open Blog')
@@ -475,10 +462,6 @@ class NoteHistoryList extends React.Component {
     const menu = new Menu()
 
     if (location.pathname.match(/\/trash/)) {
-      menu.append(new MenuItem({
-        label: restoreNote,
-        click: this.restoreNote
-      }))
       menu.append(new MenuItem({
         label: deleteLabel,
         click: this.deleteNote
@@ -493,14 +476,6 @@ class NoteHistoryList extends React.Component {
       menu.append(new MenuItem({
         label: deleteLabel,
         click: this.deleteNote
-      }))
-      menu.append(new MenuItem({
-        label: cloneNote,
-        click: this.cloneNote.bind(this)
-      }))
-      menu.append(new MenuItem({
-        label: copyNoteLink,
-        click: this.copyNoteLink(note)
       }))
       if (note.type === 'MARKDOWN_NOTE') {
         if (note.blog && note.blog.blogLink && note.blog.blogId) {
@@ -526,7 +501,7 @@ class NoteHistoryList extends React.Component {
   updateSelectedNotes (updateFunc, cleanSelection = true) {
     const { selectedNoteKeys } = this.state
     const { dispatch } = this.props
-    const notes = this.notes.map((note) => Object.assign({}, note))
+    const notes = this.revisions.map((note) => Object.assign({}, note))
     const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
 
     if (!_.isFunction(updateFunc)) {
@@ -562,115 +537,6 @@ class NoteHistoryList extends React.Component {
     })
   }
 
-  restoreNote () {
-    this.updateSelectedNotes((note) => {
-      note.isTrashed = false
-      return note
-    })
-  }
-
-  deleteNote () {
-    const { dispatch } = this.props
-    const { selectedNoteKeys } = this.state
-    const notes = this.notes.map((note) => Object.assign({}, note))
-    const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
-    const firstNote = selectedNotes[0]
-    const { confirmDeletion } = this.props.config.ui
-
-    if (firstNote.isTrashed) {
-      if (!confirmDeleteNote(confirmDeletion, true)) return
-
-      Promise.all(
-        selectedNotes.map((note) => {
-          return dataApi
-            .deleteNote(note.storage, note.key)
-        })
-      )
-      .then((data) => {
-        data.forEach((item) => {
-          dispatch({
-            type: 'DELETE_NOTE',
-            storageKey: item.storageKey,
-            noteKey: item.noteKey
-          })
-        })
-      })
-      .catch((err) => {
-        console.error('Cannot Delete note: ' + err)
-      })
-      console.log('Notes were all deleted')
-    } else {
-      if (!confirmDeleteNote(confirmDeletion, false)) return
-
-      Promise.all(
-        selectedNotes.map((note) => {
-          note.isTrashed = true
-
-          return dataApi
-          .updateNote(note.storage, note.key, note)
-        })
-      )
-      .then((newNotes) => {
-        newNotes.forEach((newNote) => {
-          dispatch({
-            type: 'UPDATE_NOTE',
-            note: newNote
-          })
-        })
-        AwsMobileAnalyticsConfig.recordDynamicCustomEvent('EDIT_NOTE')
-        console.log('Notes went to trash')
-      })
-      .catch((err) => {
-        console.error('Notes could not go to trash: ' + err)
-      })
-    }
-    this.setState({ selectedNoteKeys: [] })
-  }
-
-  cloneNote () {
-    const { selectedNoteKeys } = this.state
-    const { dispatch, location } = this.props
-    const { storage, folder } = this.resolveTargetFolder()
-    const notes = this.notes.map((note) => Object.assign({}, note))
-    const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
-    const firstNote = selectedNotes[0]
-    const eventName = firstNote.type === 'MARKDOWN_NOTE' ? 'ADD_MARKDOWN' : 'ADD_SNIPPET'
-
-    AwsMobileAnalyticsConfig.recordDynamicCustomEvent(eventName)
-    AwsMobileAnalyticsConfig.recordDynamicCustomEvent('ADD_ALLNOTE')
-    dataApi
-      .createNote(storage.key, {
-        type: firstNote.type,
-        folder: folder.key,
-        title: firstNote.title + ' ' + i18n.__('copy'),
-        content: firstNote.content
-      })
-      .then((note) => {
-        attachmentManagement.cloneAttachments(firstNote, note)
-        return note
-      })
-      .then((note) => {
-        dispatch({
-          type: 'UPDATE_NOTE',
-          note: note
-        })
-
-        this.setState({
-          selectedNoteKeys: [note.key]
-        })
-
-        hashHistory.push({
-          pathname: location.pathname,
-          query: {key: note.key}
-        })
-      })
-  }
-
-  copyNoteLink (note) {
-    const noteLink = `[${note.title}](:note:${note.key})`
-    return copy(noteLink)
-  }
-
   save (note) {
     const { dispatch } = this.props
     dataApi
@@ -694,7 +560,7 @@ class NoteHistoryList extends React.Component {
 
   publishMarkdownNow () {
     const {selectedNoteKeys} = this.state
-    const notes = this.notes.map((note) => Object.assign({}, note))
+    const notes = this.revisions.map((note) => Object.assign({}, note))
     const selectedNotes = findNotesByKeys(notes, selectedNoteKeys)
     const firstNote = selectedNotes[0]
     const config = ConfigManager.get()
@@ -791,54 +657,9 @@ class NoteHistoryList extends React.Component {
     })
   }
 
-  handleDrop (e) {
-    e.preventDefault()
-    const { location } = this.props
-    const filepaths = Array.from(e.dataTransfer.files).map(file => { return file.path })
-    if (!location.pathname.match(/\/trashed/)) this.addNotesFromFiles(filepaths)
-  }
-
-  // Add notes to the current folder
-  addNotesFromFiles (filepaths) {
-    const { dispatch, location } = this.props
-    const { storage, folder } = this.resolveTargetFolder()
-
-    if (filepaths === undefined) return
-    filepaths.forEach((filepath) => {
-      fs.readFile(filepath, (err, data) => {
-        if (err) throw Error('File reading error: ', err)
-
-        fs.stat(filepath, (err, {mtime, birthtime}) => {
-          if (err) throw Error('File stat reading error: ', err)
-
-          const content = data.toString()
-          const newNote = {
-            content: content,
-            folder: folder.key,
-            title: path.basename(filepath, path.extname(filepath)),
-            type: 'MARKDOWN_NOTE',
-            createdAt: birthtime,
-            updatedAt: mtime
-          }
-          dataApi.createNote(storage.key, newNote)
-          .then((note) => {
-            dispatch({
-              type: 'UPDATE_NOTE',
-              note: note
-            })
-            hashHistory.push({
-              pathname: location.pathname,
-              query: {key: getNoteKey(note)}
-            })
-          })
-        })
-      })
-    })
-  }
-
   getTargetIndex () {
     const { location } = this.props
-    const targetIndex = _.findIndex(this.notes, (note) => {
+    const targetIndex = _.findIndex(this.revisions, (note) => {
       return getNoteKey(note) === location.query.key
     })
     return targetIndex
@@ -882,32 +703,10 @@ class NoteHistoryList extends React.Component {
     return _.find(this.getNoteStorage(note).folders, ({ key }) => key === note.folder)
   }
 
-  getViewType () {
-    const { pathname } = this.props.location
-    const folder = /\/folders\/[a-zA-Z0-9]+/.test(pathname)
-    const storage = /\/storages\/[a-zA-Z0-9]+/.test(pathname) && !folder
-    const allNotes = pathname === '/home'
-    if (allNotes) return 'ALL'
-    if (folder) return 'FOLDER'
-    if (storage) return 'STORAGE'
-  }
-
   render () {
     const { location, config } = this.props
-    let { notes } = this.props
-    const { selectedNoteKeys } = this.state
-    const sortFunc = config.sortBy === 'CREATED_AT'
-      ? sortByCreatedAt
-      : config.sortBy === 'ALPHABETICAL'
-      ? sortByAlphabetical
-      : sortByUpdatedAt
-    const sortedNotes = location.pathname.match(/\/starred|\/trash/)
-        ? this.getNotes().sort(sortFunc)
-        : this.sortByPin(this.getNotes().sort(sortFunc))
-    this.notes = notes = sortedNotes.filter((note) => {
-      // this is for the trash box
-      if (note.isTrashed !== true || location.pathname === '/trashed') return true
-    })
+    let { note, selectedNoteKeys } = this.props
+    if (selectedNoteKeys === undefined) selectedNoteKeys = []    
 
     moment.updateLocale('en', {
       relativeTime: {
@@ -928,9 +727,8 @@ class NoteHistoryList extends React.Component {
       }
     })
 
-    const viewType = this.getViewType()
-
-    const noteHistoryList = notes
+    this.revisions = localHistory.getNoteRevisions(note.storage, note.key)
+    const revisionList = this.revisions
       .map(note => {
         if (note == null) {
           return null
@@ -944,12 +742,10 @@ class NoteHistoryList extends React.Component {
             ? note.createdAt : note.updatedAt
         ).fromNow('D')
 
-        if (isDefault) {
           return (
-            <NoteItem
+          <RevisionListItem
               isActive={isActive}
               note={note}
-              dateDisplay={dateDisplay}
               key={uniqueKey}
               handleNoteContextMenu={this.handleNoteContextMenu.bind(this)}
               handleNoteClick={this.handleNoteClick.bind(this)}
@@ -957,23 +753,7 @@ class NoteHistoryList extends React.Component {
               pathname={location.pathname}
               folderName={this.getNoteFolder(note).name}
               storageName={this.getNoteStorage(note).name}
-              viewType={viewType}
-            />
-          )
-        }
-
-        return (
-          <NoteItemSimple
-            isActive={isActive}
-            note={note}
-            key={uniqueKey}
-            handleNoteContextMenu={this.handleNoteContextMenu.bind(this)}
-            handleNoteClick={this.handleNoteClick.bind(this)}
-            handleDragStart={this.handleDragStart.bind(this)}
-            pathname={location.pathname}
-            folderName={this.getNoteFolder(note).name}
-            storageName={this.getNoteStorage(note).name}
-            viewType={viewType}
+            viewType = "STORAGE"
           />
         )
       })
@@ -982,47 +762,14 @@ class NoteHistoryList extends React.Component {
       <div className='NoteHistoryList'
         styleName='root'
         style={this.props.style}
-        onDrop={(e) => this.handleDrop(e)}
       >
-        <div styleName='control'>
-          <div styleName='control-sortBy'>
-            <i className='fa fa-angle-down' />
-            <select styleName='control-sortBy-select'
-              title={i18n.__('Select filter mode')}
-              value={config.sortBy}
-              onChange={(e) => this.handleSortByChange(e)}
-            >
-              <option title='Sort by update time' value='UPDATED_AT'>{i18n.__('Updated')}</option>
-              <option title='Sort by create time' value='CREATED_AT'>{i18n.__('Created')}</option>
-              <option title='Sort alphabetically' value='ALPHABETICAL'>{i18n.__('Alphabetically')}</option>
-            </select>
-          </div>
-          <div styleName='control-button-area'>
-            <button title={i18n.__('Default View')} styleName={config.listStyle === 'DEFAULT'
-                ? 'control-button--active'
-                : 'control-button'
-              }
-              onClick={(e) => this.handleListStyleButtonClick(e, 'DEFAULT')}
-            >
-              <img styleName='iconTag' src='../resources/icon/icon-column.svg' />
-            </button>
-            <button title={i18n.__('Compressed View')} styleName={config.listStyle === 'SMALL'
-                ? 'control-button--active'
-                : 'control-button'
-              }
-              onClick={(e) => this.handleListStyleButtonClick(e, 'SMALL')}
-            >
-              <img styleName='iconTag' src='../resources/icon/icon-column-list.svg' />
-            </button>
-          </div>
-        </div>
         <div styleName='list'
           ref='list'
           tabIndex='-1'
           onKeyDown={(e) => this.handleNoteHistoryListKeyDown(e)}
           onKeyUp={this.handleNoteHistoryListKeyUp}
         >
-          {noteHistoryList}
+          {revisionList}
         </div>
       </div>
     )

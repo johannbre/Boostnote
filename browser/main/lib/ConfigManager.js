@@ -16,6 +16,7 @@ export const DEFAULT_CONFIG = {
   isSideNavFolded: false,
   listWidth: 280,
   navWidth: 200,
+  revisionListWidth: 280,
   sortBy: 'UPDATED_AT', // 'CREATED_AT', 'UPDATED_AT', 'APLHABETICAL'
   sortTagsBy: 'ALPHABETICAL', // 'ALPHABETICAL', 'COUNTER'
   listStyle: 'DEFAULT', // 'DEFAULT', 'SMALL'
