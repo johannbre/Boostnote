@@ -7,27 +7,32 @@ import ee from 'browser/main/lib/eventEmitter'
 import ModalEscButton from 'browser/components/ModalEscButton'
 import AwsMobileAnalyticsConfig from 'browser/main/lib/AwsMobileAnalyticsConfig'
 import i18n from 'browser/lib/i18n'
-import HistoryList from '../ViewNoteHistory/HistoryList'
+import NoteRevisionList from '../ViewNoteHistory/RevisionList'
 import ConfigManager from 'browser/main/lib/ConfigManager'
 import localHistory from 'browser/main/lib/dataApi/localHistoryManagement'
-import reactDiff from 'react-diff-view'
-import unidiff from 'unidiff'
+import { parseDiff, Diff } from 'react-diff-view'
+import { diffAsText }  from 'unidiff'
+import 'style!css!../../../node_modules/react-diff-view/src/Diff.css'
+import 'style!css!../../../node_modules/react-diff-view/src/Hunk.css'
+import 'style!css!../../../node_modules/react-diff-view/src/Change.css'
 
 class ShowHistoryModal extends React.Component {
   constructor(props) {
     super(props)
 
-    this.state = {
-      revisionListWidth: props.config.revisionListWidth,
-    }
-
     this.data = {
       note: props.note,
       revisions: localHistory.getNoteRevisions(props.note.storage, props.note.key)
     }
+
+    this.state = {
+      revisionListWidth: props.config.revisionListWidth,
+      activeRevision: this.data.revisions[0]
+    }
   }
 
   componentDidMount() {
+
   }
 
   handleCloseButtonClick(e) {
@@ -87,13 +92,13 @@ class ShowHistoryModal extends React.Component {
   }
 
   render() {
-    debugger
-    var diff = require('unidiff').diffAsText(
+    var diff = diffAsText(
       this.data.note.content,
-      this.data.revisions[0].content,
-      {context: 2})
+      this.state.activeRevision.content,
+      {context: 20})
 
-    var diffDisp = require('react-diff-view').parseDiff(diff)
+    var files = parseDiff("diff --git a/current b/previous\nindex 0..0\n" + diff)
+    debugger
     return (
       <div styleName='root'
         tabIndex='-1'
@@ -106,7 +111,7 @@ class ShowHistoryModal extends React.Component {
         </div>
         <ModalEscButton handleEscButtonClick={(e) => this.handleCloseButtonClick(e)} />
 
-        <HistoryList style={{ width: this.state.revisionListWidth }}
+        <NoteRevisionList style={{ width: this.state.revisionListWidth }}
           revisions={this.data.revisions}
           {..._.pick(this.props, [
             'dispatch',
@@ -118,6 +123,9 @@ class ShowHistoryModal extends React.Component {
           ])}
         />
 
+        <div styleName='diff' style={{left: this.state.revisionListWidth}}> 
+          {files.map(({hunks}, i) => <Diff key = {i} hunks = {hunks} viewType="split" /> )} 
+        </div>
 
         <div styleName={this.state.isLeftSliderFocused ? 'slider--active' : 'slider'}
           style={{ left: this.state.revisionListWidth - 1 }}
@@ -131,7 +139,6 @@ class ShowHistoryModal extends React.Component {
   }
 }
 
-ShowHistoryModal.propTypes = {
-}
+ShowHistoryModal.propTypes = {}
 
 export default CSSModules(ShowHistoryModal, styles)

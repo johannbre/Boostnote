@@ -2,7 +2,7 @@
 import PropTypes from 'prop-types'
 import React from 'react'
 import CSSModules from 'browser/lib/CSSModules'
-import styles from './NoteHistoryList.styl'
+import styles from './RevisionList.styl'
 import moment from 'moment'
 import _ from 'lodash'
 import ee from 'browser/main/lib/eventEmitter'
@@ -29,7 +29,7 @@ function getNoteKey (note) {
   return note.key
 }
 
-class NoteHistoryList extends React.Component {
+class NoteRevisionList extends React.Component {
   constructor (props) {
     super(props)
 
@@ -47,7 +47,7 @@ class NoteHistoryList extends React.Component {
       this.alertIfSnippet()
     }
     this.jumpNoteByHash = this.jumpNoteByHashHandler.bind(this)
-    this.handleNoteHistoryListKeyUp = this.handleNoteHistoryListKeyUp.bind(this)
+    this.handleNoteRevisionListKeyUp = this.handleNoteRevisionListKeyUp.bind(this)
     this.getNoteKeyFromTargetIndex = this.getNoteKeyFromTargetIndex.bind(this)
     this.focusNote = this.focusNote.bind(this)
     this.getNoteStorage = this.getNoteStorage.bind(this)
@@ -238,7 +238,7 @@ class NoteHistoryList extends React.Component {
     ee.emit('list:moved')
   }
 
-  handleNoteHistoryListKeyDown (e) {
+  handleNoteRevisionListKeyDown (e) {
     if (e.metaKey || e.ctrlKey) return true
 
     // A key
@@ -282,7 +282,7 @@ class NoteHistoryList extends React.Component {
     }
   }
 
-  handleNoteHistoryListKeyUp (e) {
+  handleNoteRevisionListKeyUp (e) {
     if (!e.shiftKey) {
       this.setState({ shiftKeyDown: false })
     }
@@ -762,15 +762,15 @@ class NoteHistoryList extends React.Component {
       })
 
     return (
-      <div className='NoteHistoryList'
+      <div className='NoteRevisionList'
         styleName='root'
         style={this.props.style}
       >
         <div styleName='list'
           ref='list'
           tabIndex='-1'
-          onKeyDown={(e) => this.handleNoteHistoryListKeyDown(e)}
-          onKeyUp={this.handleNoteHistoryListKeyUp}
+          onKeyDown={(e) => this.handleNoteRevisionListKeyDown(e)}
+          onKeyUp={this.handleNoteRevisionListKeyUp}
         >
           {revisionList}
         </div>
@@ -778,11 +778,11 @@ class NoteHistoryList extends React.Component {
     )
   }
 }
-NoteHistoryList.contextTypes = {
+NoteRevisionList.contextTypes = {
   router: PropTypes.shape([])
 }
 
-NoteHistoryList.propTypes = {
+NoteRevisionList.propTypes = {
   dispatch: PropTypes.func,
   repositories: PropTypes.array,
   style: PropTypes.shape({
@@ -790,4 +790,4 @@ NoteHistoryList.propTypes = {
   })
 }
 
-export default CSSModules(NoteHistoryList, styles)
+export default CSSModules(NoteRevisionList, styles)
