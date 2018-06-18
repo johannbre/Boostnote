@@ -33,6 +33,7 @@ class NoteRevisionList extends React.Component {
   constructor (props) {
     super(props)
 
+    debugger
     this.selectNextNoteHandler = () => {
       console.log('fired next')
       this.selectNextNote()
@@ -779,7 +780,6 @@ class NoteRevisionList extends React.Component {
   }
 }
 NoteRevisionList.contextTypes = {
-  router: PropTypes.shape([])
 }
 
 NoteRevisionList.propTypes = {

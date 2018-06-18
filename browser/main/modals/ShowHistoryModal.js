@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types'
 import React from 'react'
 import CSSModules from 'browser/lib/CSSModules'
 import styles from './ShowHistoryModal.styl'
@@ -16,18 +17,24 @@ import 'style!css!../../../node_modules/react-diff-view/src/Diff.css'
 import 'style!css!../../../node_modules/react-diff-view/src/Hunk.css'
 import 'style!css!../../../node_modules/react-diff-view/src/Change.css'
 
+function findNotesByKeys(notes, noteKeys) {
+  return notes.filter((note) => noteKeys.includes(note.key))
+}
+
 class ShowHistoryModal extends React.Component {
   constructor(props) {
     super(props)
 
-    this.data = {
-      note: props.note,
-      revisions: localHistory.getNoteRevisions(props.note.storage, props.note.key)
-    }
-
     this.state = {
       revisionListWidth: props.config.revisionListWidth,
-      activeRevision: this.data.revisions[0]
+      selectedNoteKeys: []
+    }
+
+    this.baseNote = props.note
+    this.revisions = localHistory.getNoteRevisions(this.baseNote.storage, this.baseNote.key)
+    if (this.revisions != null && this.revisions.length > 0) {
+      let { selectedNoteKeys } = this.state
+      selectedNoteKeys.push(this.revisions[0].key)
     }
   }
 
@@ -92,13 +99,15 @@ class ShowHistoryModal extends React.Component {
   }
 
   render() {
+    let { selectedNoteKeys } = this.state
+    var selectedRevision = findNotesByKeys(this.revisions, selectedNoteKeys)
+
     var diff = diffAsText(
-      this.data.note.content,
-      this.state.activeRevision.content,
+      this.baseNote.content,
+      selectedRevision[0].content,
       {context: 20})
 
     var files = parseDiff("diff --git a/current b/previous\nindex 0..0\n" + diff)
-    debugger
     return (
       <div styleName='root'
         tabIndex='-1'
@@ -112,14 +121,14 @@ class ShowHistoryModal extends React.Component {
         <ModalEscButton handleEscButtonClick={(e) => this.handleCloseButtonClick(e)} />
 
         <NoteRevisionList style={{ width: this.state.revisionListWidth }}
-          revisions={this.data.revisions}
+          revisions={this.revisions}
+          selectedNoteKeys={this.state.selectedNoteKeys}
           {..._.pick(this.props, [
             'dispatch',
             'data',
             'config',
             'params',
-            'location',
-            'selectedNoteKeys'
+            'location'
           ])}
         />
 
@@ -140,5 +149,8 @@ class ShowHistoryModal extends React.Component {
 }
 
 ShowHistoryModal.propTypes = {}
+
+ShowHistoryModal.contextTypes = {
+}
 
 export default CSSModules(ShowHistoryModal, styles)
